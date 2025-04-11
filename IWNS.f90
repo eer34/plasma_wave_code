@@ -39,13 +39,13 @@
 	  		open(fid,file='output.csv')
         end if
 		beta_in=0.001
-		kap_n_in=0.01
+		kap_n_in=0.04
 		kap_ti_in=0.2
 		kap_te_in=0.0
-		k_para_rho_i_in=1.256*1d-3
+		k_para_rho_i_in=1.256*1d-2
 		k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)
-		k_x_rho_i_in=1.0
-		k_y_rho_i_in=1.0
+		k_x_rho_i_in=0.4
+		k_y_rho_i_in=0.4
 
 		call set_parameter_itg(beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
 		do k=1,5
