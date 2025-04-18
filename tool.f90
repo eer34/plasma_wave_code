@@ -11,10 +11,13 @@
  implicit none
  private c_div_v_para,omega_div_omega_ci,omega_div_omega_ce,omega_pi_div_omega_ci,omega_pe_div_omega_ce,ratio_ti,ratio_te,refractive_para
  private k_para_rho_i_para,k_per_rho_i_para,k_per_rho_i_per,k_para_rho_e_para,k_para_rho_e_per,k_per_rho_e_para,k_per_rho_e_per
- private beta,kap_n,kap_ti,kap_te,k_para_rho_i,k_para_rho_e,k_x_rho_i,k_y_rho_i
+ private beta,kap_n,kap_ti,kap_te,k_para_rho_i,k_para_rho_e,k_x_rho_i,k_y_rho_i,k_per_rho_i,kap_n_rho_i,kap_ti_rho_i,kap_te_rho_i
+ private n_integral,k_integral,omega_integral
  real(wp)::c_div_v_para,omega_div_omega_ci,omega_div_omega_ce,omega_pi_div_omega_ci,omega_pe_div_omega_ce,k_per_rho_e_per,ratio_ti,ratio_te,refractive_para
  real(wp)::k_para_rho_i_para,k_per_rho_i_para,k_per_rho_i_per,k_para_rho_e_para,k_para_rho_e_per,k_per_rho_e_para
- real(wp)::beta,kap_n,kap_ti,kap_te,k_para_rho_i,k_para_rho_e,k_x_rho_i,k_y_rho_i
+ real(wp)::beta,kap_n,kap_ti,kap_te,k_para_rho_i,k_para_rho_e,k_x_rho_i,k_y_rho_i,k_per_rho_i,kap_n_rho_i,kap_ti_rho_i,kap_te_rho_i
+ integer::n_integral,k_integral
+ complex(wp)::omega_integral
 contains
 
 !-----------------------------------------------------------------------------!
@@ -250,8 +253,8 @@ contains
 		k_para_rho_e=k_para_rho_e_in
 		k_x_rho_i=k_x_rho_i_in	
 		k_y_rho_i=k_y_rho_i_in
-			
 	end subroutine set_parameter_itg
+
 !-----------------------------------------------------------------------------!
 !     dispersion_function_itg: the dispersion relation of itg with omega as the varable.
 !-----------------------------------------------------------------------------!
@@ -284,6 +287,1507 @@ contains
 	Le=omega
 	dispersion_function_itg=-b*k_para_rho_i/x*(Mi-Me-1+gamma_0)-beta*(Ne-Ni)*(1-gamma_0-Li+Le)
 	end function dispersion_function_itg
+
+!-----------------------------------------------------------------------------!
+!     set_parameter_itg_full:given k to calculate omega for ITG for full kinetic ion vlasov equation
+!     here kap_te is nomarlized to $1/\rho_{ti}$ 
+!-----------------------------------------------------------------------------!
+    
+    subroutine set_parameter_itg_full(c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
+		implicit none
+		real(wp),intent(in)::c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in
+		real(wp)::ti_div_te,mass_ratio
+		mass_ratio=1836.0_wp
+		ti_div_te=(k_para_rho_i_in/k_para_rho_e_in)**2/mass_ratio
+		c_div_v_para=c_div_v_para_input
+		beta=beta_in
+		kap_n_rho_i=kap_n_in
+		kap_ti_rho_i=kap_ti_in
+		kap_te_rho_i=kap_te_in
+		k_para_rho_i=k_para_rho_i_in
+		k_para_rho_e=k_para_rho_e_in
+		k_x_rho_i=k_x_rho_i_in	
+		k_y_rho_i=k_y_rho_i_in
+		k_per_rho_i=(k_x_rho_i**2+k_y_rho_i**2)**0.5
+		omega_pe_div_omega_ce=beta*2*c_div_v_para*ti_div_te/mass_ratio
+		omega_pi_div_omega_ci=omega_pe_div_omega_ce*mass_ratio
+	end subroutine set_parameter_itg_full
+
+!-----------------------------------------------------------------------------!
+!     dispersion_function_itg_full_matrix: dispersion matrix of omega for itg instability with full kinetic ions
+!-----------------------------------------------------------------------------!
+    subroutine dispersion_function_itg_full_matrix(x,D)
+		implicit none
+		complex(wp),intent(in)::x
+		complex(wp),intent(out)::D(:,:)
+		complex(wp)::xi_pdf,yi_pdf,x_e,series_sum
+		complex(wp)::xe_pdf,ye_pdf
+		real(wp)::k_x_c_div_omega_ci,k_y_c_div_omega_ci,k_z_c_div_omega_ci,kap_n_c_div_omega_ci,kap_te_c_div_omega_ci
+		real(wp)::mass_ratio
+		integer::n,k
+		mass_ratio=1836.0_wp
+		x_e=-x/mass_ratio
+		k_x_c_div_omega_ci=k_x_rho_i*(c_div_v_para)**(0.5)
+		k_y_c_div_omega_ci=k_y_rho_i*(c_div_v_para)**(0.5)
+		k_z_c_div_omega_ci=k_para_rho_i*(c_div_v_para)**(0.5)
+		kap_n_c_div_omega_ci=kap_n_rho_i*(c_div_v_para)**(0.5)
+		kap_te_c_div_omega_ci=kap_te_rho_i*(c_div_v_para)**(0.5)
+		xe_pdf=(x_e)/k_para_rho_e
+		call pdf(xe_pdf,ye_pdf)
+		
+		D(1,1)=-(0,1)*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e-2*(0,1)*beta*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x/(-mass_ratio)*ye_pdf/k_para_rho_e
+		D(1,2)=(0,1)*(k_x_c_div_omega_ci**2+k_z_c_div_omega_ci**2)/x**2+beta*k_x_c_div_omega_ci*(kap_n_c_div_omega_ci+kap_te_c_div_omega_ci)/x**2+2*(0,1)*beta*k_x_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
+		D(1,3)=-(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_x_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))-k_x_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
+		D(2,1)=-(0,1)*(k_z_c_div_omega_ci**2+k_y_c_div_omega_ci**2)/x**2-2*(0,1)*beta*k_y_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
+		D(2,2)=(0,1)*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e+beta*k_y_c_div_omega_ci*(kap_n_c_div_omega_ci+kap_te_c_div_omega_ci)/x**2+2*(0,1)*beta*k_y_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
+		D(2,3)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_y_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))-k_y_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
+		D(3,1)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_y_rho_i/k_para_rho_i)
+		D(3,2)=(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2+omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_x_rho_i/k_para_rho_i)
+		D(3,3)=-(0,1)*(k_x_c_div_omega_ci**2+k_y_c_div_omega_ci**2)/x**2+(0,1)*omega_pe_div_omega_ce/x_e*(k_y_rho_i/k_para_rho_i)*((1+xe_pdf*ye_pdf)*(kap_n_rho_i-0.5*kap_te_rho_i)/k_para_rho_i+(xe_pdf**2+0.5+xe_pdf**3*ye_pdf)*kap_te_rho_i/k_para_rho_i)+2*(0,1)*omega_pe_div_omega_ce/x_e**2*(xe_pdf**2+xe_pdf**3*ye_pdf)
+	
+		do k=1,9
+			select case(k)
+			case(1)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+omega_pi_div_omega_ci/x/k_para_rho_i*yi_pdf*(ji_plus_ex_1(n)-ji_minus_ex_1(n))+0.5*(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ex_2(n,xi_pdf,yi_pdf)-ji_minus_ex_2(n,xi_pdf,yi_pdf))-0.5*omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*(ji_plus_ex_3(n,xi_pdf,yi_pdf)-ji_minus_ex_3(n,xi_pdf,yi_pdf))
+				end do
+				D(1,1)=D(1,1)+series_sum
+			case(2)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*yi_pdf*(ji_plus_ey_1(n)-ji_minus_ey_1(n))-0.5*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ey_2(n,xi_pdf,yi_pdf)-ji_minus_ey_2(n,xi_pdf,yi_pdf))-omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ey_3(n,xi_pdf,yi_pdf)-ji_minus_ey_3(n,xi_pdf,yi_pdf))+0.5*omega_pi_div_omega_ci/x**2*k_x_rho_i/k_para_rho_i*(ji_plus_ex_3(n,xi_pdf,yi_pdf)-ji_minus_ex_3(n,xi_pdf,yi_pdf))+omega_pi_div_omega_ci/x**2*(ji_plus_ez_3(n,xi_pdf,yi_pdf)-ji_minus_ez_3(n,xi_pdf,yi_pdf))
+				end do
+				D(1,2)=D(1,2)+series_sum
+			case(3)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+2*omega_pi_div_omega_ci/x/k_para_rho_i*(1+xi_pdf*yi_pdf)*(ji_plus_ez_1(n)-ji_minus_ez_1(n))+(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ez_2(n,xi_pdf,yi_pdf)-ji_minus_ez_2(n,xi_pdf,yi_pdf))-omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*(ji_plus_ez_3(n,xi_pdf,yi_pdf)-ji_minus_ez_3(n,xi_pdf,yi_pdf))
+				end do
+				D(1,3)=D(1,3)+series_sum
+			case(4)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*yi_pdf*(ji_plus_ex_1(n)+ji_minus_ex_1(n))-0.5*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ex_2(n,xi_pdf,yi_pdf)+ji_minus_ex_2(n,xi_pdf,yi_pdf))-0.5*(0,1)*omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*(ji_plus_ex_3(n,xi_pdf,yi_pdf)+ji_minus_ex_3(n,xi_pdf,yi_pdf))
+				end do
+				D(2,1)=D(2,1)+series_sum
+			case(5)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum-omega_pi_div_omega_ci/x/k_para_rho_i*yi_pdf*(ji_plus_ey_1(n)+ji_minus_ey_1(n))-0.5*(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ey_2(n,xi_pdf,yi_pdf)+ji_minus_ey_2(n,xi_pdf,yi_pdf))-(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ey_3(n,xi_pdf,yi_pdf)+ji_minus_ey_3(n,xi_pdf,yi_pdf))+0.5*(0,1)*omega_pi_div_omega_ci/x**2*k_x_rho_i/k_para_rho_i*(ji_plus_ex_3(n,xi_pdf,yi_pdf)+ji_minus_ex_3(n,xi_pdf,yi_pdf))+(0,1)*omega_pi_div_omega_ci/x**2*(ji_plus_ez_3(n,xi_pdf,yi_pdf)+ji_minus_ez_3(n,xi_pdf,yi_pdf))
+				end do
+				D(2,2)=D(2,2)+series_sum
+			case(6)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+2*(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*(1+xi_pdf*yi_pdf)*(ji_plus_ez_1(n)+ji_minus_ez_1(n))-omega_pi_div_omega_ci/x/k_para_rho_i*(ji_plus_ez_2(n,xi_pdf,yi_pdf)+ji_minus_ez_2(n,xi_pdf,yi_pdf))-(0,1)*omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*(ji_plus_ez_3(n,xi_pdf,yi_pdf)+ji_minus_ez_3(n,xi_pdf,yi_pdf))
+				end do
+				D(2,3)=D(2,3)+series_sum
+			case(7)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+(0,1)*2*omega_pi_div_omega_ci/x*(1+xi_pdf*yi_pdf)/k_para_rho_i*ji_z_ex_1(n)-omega_pi_div_omega_ci/x/k_para_rho_i*ji_z_ex_2(n,xi_pdf,yi_pdf)-(0,1)*omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*ji_z_ex_3(n,xi_pdf,yi_pdf)
+				end do
+				D(3,1)=D(3,1)+series_sum
+			case(8)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum-2*omega_pi_div_omega_ci/x*(1+xi_pdf*yi_pdf)/k_para_rho_i*ji_z_ey_1(n)+(0,1)*omega_pi_div_omega_ci/x/k_para_rho_i*ji_z_ey_2(n,xi_pdf,yi_pdf)-(0,1)*2*omega_pi_div_omega_ci/x/k_para_rho_i*ji_z_ey_3(n,x,xi_pdf,yi_pdf)+2*(0,1)*omega_pi_div_omega_ci/x**2*ji_z_ez_3(n,xi_pdf,yi_pdf)
+				end do
+				D(3,2)=D(3,2)+series_sum
+			case(9)
+				series_sum=(0,0)
+				do n=-10,10
+					xi_pdf=(x-n)/k_para_rho_i
+					call pdf(xi_pdf,yi_pdf)
+					series_sum=series_sum+4*(0,1)*omega_pi_div_omega_ci/x*xi_pdf*(1+xi_pdf*yi_pdf)/k_para_rho_i*ji_z_ez_1(n)-2*omega_pi_div_omega_ci/x/k_para_rho_i*ji_z_ez_2(n,xi_pdf,yi_pdf)-2*(0,1)*omega_pi_div_omega_ci/x**2*k_y_rho_i/k_para_rho_i*ji_z_ez_3(n,xi_pdf,yi_pdf)
+				end do
+				D(3,3)=D(3,3)+series_sum
+			case default 
+			end select
+
+		end do
+	end subroutine dispersion_function_itg_full_matrix
+!-----------------------------------------------------------------------------!
+!     dispersion_function_itg_full::the itg dispersion relation with full kinetic ion. Here k is given to calculate omega.
+!-----------------------------------------------------------------------------!
+	complex(wp) function dispersion_function_itg_full(x)
+		implicit none
+		complex(wp),intent(in)::x
+		complex(wp)::y,D(3,3)
+		y=x/100
+		call dispersion_function_itg_full_matrix(y,D)
+		dispersion_function_itg_full=det(D,3)
+
+	end function dispersion_function_itg_full
+!-----------------------------------------------------------------------------!
+!     ji_z_ex::calculate the integral of Ji_z
+!-----------------------------------------------------------------------------!
+	real(wp) function ji_z_ex_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_1_integral_real=real(x**2*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi))
+    
+    end function ji_z_ex_1_integral_real
+    
+    real(wp) function ji_z_ex_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_1_integral_imag=aimag(x**2*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi))
+
+    end function ji_z_ex_1_integral_imag
+     
+    complex(wp) function ji_z_ex_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_z_ex_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ex_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ex_1=cmplx(ans_real,ans_imag)
+	end function ji_z_ex_1
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ex_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+    
+    end function ji_z_ex_2_integral_real
+    
+    real(wp) function ji_z_ex_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+
+    end function ji_z_ex_2_integral_imag
+     
+    complex(wp) function ji_z_ex_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_z_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ex_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_z_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ex_2=ji_z_ex_2+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ex_2
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ex_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_3_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+    
+    end function ji_z_ex_3_integral_real
+    
+    real(wp) function ji_z_ex_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ex_3_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+    
+    end function ji_z_ex_3_integral_imag
+     
+    complex(wp) function ji_z_ex_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_z_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ex_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_z_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ex_3=ji_z_ex_3+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ex_3
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ey_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_1_integral_real=real(x**2*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi))
+    
+    end function ji_z_ey_1_integral_real
+    
+    real(wp) function ji_z_ey_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_1_integral_imag=aimag(x**2*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi))
+    
+    end function ji_z_ey_1_integral_imag
+     
+    complex(wp) function ji_z_ey_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_z_ey_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ey_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ey_1=cmplx(ans_real,ans_imag)
+	end function ji_z_ey_1
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ey_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+    
+    end function ji_z_ey_2_integral_real
+    
+    real(wp) function ji_z_ey_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*(bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi))
+
+    end function ji_z_ey_2_integral_imag
+     
+    complex(wp) function ji_z_ey_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_z_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ey_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_z_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ey_2=ji_z_ey_2+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ey_2
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ey_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_3_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral,k_per_rho_i*x)-k_x_rho_i/omega_integral*x*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi)/2))
+    
+    end function ji_z_ey_3_integral_real
+    
+    real(wp) function ji_z_ey_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ey_3_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral,k_per_rho_i*x)-k_x_rho_i/omega_integral*x*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi)/2))
+
+    end function ji_z_ey_3_integral_imag
+     
+    complex(wp) function ji_z_ey_3(n,x,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::x,xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=1
+		omega_integral=x
+        call dqag(ji_z_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ey_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=3
+        call dqag(ji_z_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ey_3=ji_z_ey_3+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ey_3
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ez_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ez_1_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)**2)
+    
+    end function ji_z_ez_1_integral_real
+    
+    real(wp) function ji_z_ez_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	!ji_z_ez_1_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)**2)
+	ji_z_ez_1_integral_imag=0.0_wp
+    end function ji_z_ez_1_integral_imag
+    
+	complex(wp) function ji_z_ez_1(n)
+	implicit none
+	integer,intent(in)::n
+	real(wp):: a 
+	real(wp):: b 
+	real(wp)::epsabs
+	real(wp)::epsrel
+	integer,parameter:: key = 6
+	integer,parameter:: limit = 10000
+	integer,parameter:: lenw=limit*4
+	real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+	integer :: ier, iwork(limit), last, neval
+
+	a=0.0_wp
+	b=10.0_wp
+	epsabs=1d-7
+	epsrel=1d-7
+	n_integral=n
+	k_integral=1
+	call dqag(ji_z_ez_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+				abserr, neval, ier, limit, lenw, last, &
+				iwork, work)
+	call dqag(ji_z_ez_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+		abserr, neval, ier, limit, lenw, last, &
+		iwork, work)
+	ji_z_ez_1=cmplx(ans_real,ans_imag)
+
+	end function ji_z_ez_1
+
+    complex(wp) function ji_z_ez_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=1
+        call dqag(ji_z_ez_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ez_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ez_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*(xi_pdf+xi_pdf**2*yi_pdf)+kap_ti_rho_i*(xi_pdf**3+0.5*xi_pdf+xi_pdf**4*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=3
+        call dqag(ji_z_ez_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ez_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ez_3=ji_z_ez_3+kap_ti_rho_i*(xi_pdf+xi_pdf**2*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ez_3
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_z_ez_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ez_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*bessel_jn(n_integral,k_per_rho_i*x))
+    
+    end function ji_z_ez_2_integral_real
+    
+    real(wp) function ji_z_ez_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_z_ez_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi)*bessel_jn(n_integral,k_per_rho_i*x))
+    
+    end function ji_z_ez_2_integral_imag
+     
+    complex(wp) function ji_z_ez_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_z_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_z_ez_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*xi_pdf*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**3+0.5*xi_pdf+xi_pdf**4*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_z_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_z_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+
+		ji_z_ez_2=ji_z_ez_2+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+
+	end function ji_z_ez_2
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ex_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_1_integral_real=real(x**3*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2+bessel_jn(n_integral+1,k_per_rho_i*x)))
+    
+    end function ji_plus_ex_1_integral_real
+    
+    real(wp) function ji_plus_ex_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_1_integral_imag=aimag(x**3*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2+bessel_jn(n_integral+1,k_per_rho_i*x)))
+
+    end function ji_plus_ex_1_integral_imag
+     
+    complex(wp) function ji_plus_ex_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_plus_ex_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ex_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ex_1=cmplx(ans_real,ans_imag)
+	end function ji_plus_ex_1
+
+	real(wp) function ji_minus_ex_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_1_integral_real=real(x**3*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi**2))
+    
+    end function ji_minus_ex_1_integral_real
+    
+    real(wp) function ji_minus_ex_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_1_integral_imag=aimag(x**3*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)+bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi**2))
+
+    end function ji_minus_ex_1_integral_imag
+     
+    complex(wp) function ji_minus_ex_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_minus_ex_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ex_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ex_1=cmplx(ans_real,ans_imag)
+	end function ji_minus_ex_1
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ex_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**3-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi))
+    
+    end function ji_plus_ex_2_integral_real
+    
+    real(wp) function ji_plus_ex_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**3-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi))
+    end function ji_plus_ex_2_integral_imag
+     
+    complex(wp) function ji_plus_ex_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=4
+        call dqag(ji_plus_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ex_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=6
+        call dqag(ji_plus_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ex_2=ji_plus_ex_2+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_plus_ex_2
+
+	real(wp) function ji_minus_ex_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**3))
+    
+    end function ji_minus_ex_2_integral_real
+    
+    real(wp) function ji_minus_ex_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**3))
+    end function ji_minus_ex_2_integral_imag
+     
+    complex(wp) function ji_minus_ex_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=4
+        call dqag(ji_minus_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ex_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=6
+        call dqag(ji_minus_ex_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ex_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ex_2=ji_minus_ex_2+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_minus_ex_2
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ex_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_3_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2+bessel_jn(n_integral+1,k_per_rho_i*x)**2))
+    
+    end function ji_plus_ex_3_integral_real
+    
+    real(wp) function ji_plus_ex_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ex_3_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2+bessel_jn(n_integral+1,k_per_rho_i*x)**2))
+    end function ji_plus_ex_3_integral_imag
+     
+    complex(wp) function ji_plus_ex_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_plus_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ex_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_plus_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ex_3=ji_plus_ex_3+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_plus_ex_3
+
+	real(wp) function ji_minus_ex_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_3_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi**2+bessel_jn(n_integral-1,k_per_rho_i*x)**2))
+    
+    end function ji_minus_ex_3_integral_real
+    
+    real(wp) function ji_minus_ex_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ex_3_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)*e_iphi**2+bessel_jn(n_integral-1,k_per_rho_i*x)**2))
+    end function ji_minus_ex_3_integral_imag
+     
+    complex(wp) function ji_minus_ex_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_minus_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ex_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_minus_ex_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ex_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ex_3=ji_minus_ex_3+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_minus_ex_3
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ey_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_1_integral_real=real(x**3*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2-bessel_jn(n_integral+1,k_per_rho_i*x)))
+    
+    end function ji_plus_ey_1_integral_real
+    
+    real(wp) function ji_plus_ey_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_1_integral_imag=aimag(x**3*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**2-bessel_jn(n_integral+1,k_per_rho_i*x)))
+
+    end function ji_plus_ey_1_integral_imag
+     
+    complex(wp) function ji_plus_ey_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_plus_ey_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ey_1=cmplx(ans_real,ans_imag)
+	end function ji_plus_ey_1
+
+	real(wp) function ji_minus_ey_1_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_1_integral_real=real(x**3*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)-bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi**2))
+    
+    end function ji_minus_ey_1_integral_real
+    
+    real(wp) function ji_minus_ey_1_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_1_integral_imag=aimag(x**3*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*(bessel_jn(n_integral-1,k_per_rho_i*x)-bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi**2))
+
+    end function ji_minus_ey_1_integral_imag
+     
+    complex(wp) function ji_minus_ey_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+        call dqag(ji_minus_ey_1_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_1_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ey_1=cmplx(ans_real,ans_imag)
+	end function ji_minus_ey_1
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ey_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**3-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi))
+    
+    end function ji_plus_ey_2_integral_real
+    
+    real(wp) function ji_plus_ey_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi**3-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral-1,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral+2,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)/e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi))
+    end function ji_plus_ey_2_integral_imag
+     
+    complex(wp) function ji_plus_ey_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=4
+        call dqag(ji_plus_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ey_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=6
+        call dqag(ji_plus_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ey_2=ji_plus_ey_2+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_plus_ey_2
+
+	real(wp) function ji_minus_ey_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_2_integral_real=real(x**k_integral*exp(-x**2)*(bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**3))
+    
+    end function ji_minus_ey_2_integral_real
+    
+    real(wp) function ji_minus_ey_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_2_integral_imag=aimag(x**k_integral*exp(-x**2)*(bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi-bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi-bessel_jn(n_integral,k_per_rho_i*x)*bessel_jn(n_integral+1,k_per_rho_i*x)*e_iphi+bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**3))
+    end function ji_minus_ey_2_integral_imag
+     
+    complex(wp) function ji_minus_ey_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=4
+        call dqag(ji_minus_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ey_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=6
+        call dqag(ji_minus_ey_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ey_2=ji_minus_ey_2+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_minus_ey_2
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ey_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_3_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi)
+    
+    end function ji_plus_ey_3_integral_real
+    
+    real(wp) function ji_plus_ey_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ey_3_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral+1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)/e_iphi)
+    end function ji_plus_ey_3_integral_imag
+     
+    complex(wp) function ji_plus_ey_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_plus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ey_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_plus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ey_3=ji_plus_ey_3+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_plus_ey_3
+
+	real(wp) function ji_minus_ey_3_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_3_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi)
+    
+    end function ji_minus_ey_3_integral_real
+    
+    real(wp) function ji_minus_ey_3_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ey_3_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral-1,k_per_rho_i*x)*bessel_jn(n_integral,k_per_rho_i*x)*e_iphi)
+    end function ji_minus_ey_3_integral_imag
+     
+    complex(wp) function ji_minus_ey_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_minus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ey_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*yi_pdf+kap_ti_rho_i*xi_pdf*(1+xi_pdf*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_minus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ey_3=ji_minus_ey_3+kap_ti_rho_i*yi_pdf*cmplx(ans_real,ans_imag)
+	end function ji_minus_ey_3
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    complex(wp) function ji_plus_ez_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_plus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ez_1=cmplx(ans_real,ans_imag)
+	end function ji_plus_ez_1
+
+	
+     
+    complex(wp) function ji_minus_ez_1(n)
+        implicit none
+        integer,intent(in)::n
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_minus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ez_1=cmplx(ans_real,ans_imag)
+	end function ji_minus_ez_1
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	real(wp) function ji_plus_ez_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ez_2_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral+2,k_per_rho_i*x)/e_iphi**2-bessel_jn(n_integral,k_per_rho_i*x)))
+    
+    end function ji_plus_ez_2_integral_real
+    
+    real(wp) function ji_plus_ez_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_plus_ez_2_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral+2,k_per_rho_i*x)/e_iphi**2-bessel_jn(n_integral,k_per_rho_i*x)))
+    end function ji_plus_ez_2_integral_imag
+     
+    complex(wp) function ji_plus_ez_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_plus_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ez_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_plus_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ez_2=ji_plus_ez_2+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+	end function ji_plus_ez_2
+
+	real(wp) function ji_minus_ez_2_integral_real(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ez_2_integral_real=real(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral,k_per_rho_i*x)-bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**2))
+    
+    end function ji_minus_ez_2_integral_real
+    
+    real(wp) function ji_minus_ez_2_integral_imag(x)
+	implicit none
+	real(wp),intent(in)::x
+	complex(wp)::e_iphi
+	e_iphi=k_x_rho_i/k_per_rho_i+(0,1)*k_y_rho_i/k_per_rho_i
+	ji_minus_ez_2_integral_imag=aimag(x**k_integral*exp(-x**2)*bessel_jn(n_integral,k_per_rho_i*x)*(bessel_jn(n_integral,k_per_rho_i*x)-bessel_jn(n_integral-2,k_per_rho_i*x)*e_iphi**2))
+    end function ji_minus_ez_2_integral_imag
+     
+    complex(wp) function ji_minus_ez_2(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=3
+        call dqag(ji_minus_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ez_2=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=5
+        call dqag(ji_minus_ez_2_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ez_2_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ez_2=ji_minus_ez_2+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+	end function ji_minus_ez_2
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     
+    complex(wp) function ji_plus_ez_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_plus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ez_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_plus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_plus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_plus_ez_3=ji_plus_ez_3+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+	end function ji_plus_ez_3
+     
+    complex(wp) function ji_minus_ez_3(n,xi_pdf,yi_pdf)
+        implicit none
+        integer,intent(in)::n
+		complex(wp),intent(in)::xi_pdf,yi_pdf
+        real(wp):: a 
+        real(wp):: b 
+        real(wp)::epsabs
+        real(wp)::epsrel
+        integer,parameter:: key = 6
+        integer,parameter:: limit = 10000
+        integer,parameter:: lenw=limit*4
+        real(wp) :: abserr, ans_real,ans_imag, work(lenw)
+        integer :: ier, iwork(limit), last, neval
+
+        a=0.0_wp
+        b=10.0_wp
+        epsabs=1d-7
+        epsrel=1d-7
+        n_integral=n
+		k_integral=2
+        call dqag(ji_minus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ez_3=((kap_n_rho_i-1.5*kap_ti_rho_i)*(1+xi_pdf*yi_pdf)+kap_ti_rho_i*(xi_pdf**2+0.5+xi_pdf**3*yi_pdf))*cmplx(ans_real,ans_imag)
+
+		k_integral=4
+        call dqag(ji_minus_ey_3_integral_real, a, b, epsabs, epsrel, key, ans_real, &
+                    abserr, neval, ier, limit, lenw, last, &
+                    iwork, work)
+        call dqag(ji_minus_ey_3_integral_imag, a, b, epsabs, epsrel, key, ans_imag, &
+            abserr, neval, ier, limit, lenw, last, &
+            iwork, work)
+        ji_minus_ez_3=ji_minus_ez_3+kap_ti_rho_i*(1+xi_pdf*yi_pdf)*cmplx(ans_real,ans_imag)
+	end function ji_minus_ez_3
+	
+
 
 !-----------------------------------------------------------------------------!
 !     dispersion_function_parallel_matrix: dispersion matrix of omega for parallel waves
