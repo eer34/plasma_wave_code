@@ -431,7 +431,7 @@ contains
 		implicit none
 		complex(wp),intent(in)::x
 		complex(wp)::y,D(3,3)
-		y=x/100
+		y=x/1
 		call dispersion_function_itg_full_matrix(y,D)
 		dispersion_function_itg_full=det(D,3)
 
@@ -3210,7 +3210,7 @@ contains
 	complex(wp),intent(in)::x
 	complex(wp)::D(3,3)
 	integer::n,k
-	call dispersion_function_parallel_matrix(x,D)
+	call dispersion_function_matrix(x,D)
 	do n=1,3
 	    do k=1,3
 		D(n,k)=D(n,k)/1000

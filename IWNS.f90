@@ -16,6 +16,8 @@
         integer::n_circle,n_line,n_error
 		real(wp)::ti_div_te
        	real(wp)::c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in
+		real(wp)::omega_pe_div_omega_ce_input,k_para_rho_i_para_input,k_para_rho_e_para_input,k_para_rho_e_per_input,k_per_rho_i_para_input,k_per_rho_i_per_input,k_per_rho_e_para_input,k_per_rho_e_per_input
+		real(wp)::mass_ratio
         integer::fid_1,fid_2,n,k,region_i
         integer::ierr,my_id,num_procs
         real(wp)::start_cpu_time,finish_cpu_time
@@ -41,21 +43,21 @@
 			open(fid_2,file='itg_gyro.csv')
         end if
 		c_div_v_para_input=470000.0_wp
-		beta_in=0.0001
-		kap_n_in=0.0*(2.0)**(0.5)	
-		kap_ti_in=0.1*(2.0)**(0.5)	
-		kap_te_in=0.01*(2.0)**(0.5)	
-		k_para_rho_i_in=0.002*(2.0)**(0.5)	
+		beta_in=0.00195_wp
+		kap_n_in=0.0
+		kap_ti_in=0.0
+		kap_te_in=0.0
+		k_para_rho_i_in=0.1	
 		k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)	
-		k_x_rho_i_in=0.1*(2.0)**(0.5)	
-		k_y_rho_i_in=0.3*(2.0)**(0.5)	
+		k_x_rho_i_in=3.0	
+		k_y_rho_i_in=0.0	
 
 		call set_parameter_itg_full(c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
-		do k=1,2
-			left_edge=-10.01_wp-10.0_wp*(k-1)
-			right_edge=-0.01_wp-10.0_wp*(k-1)
-			down_edge=-3*k_para_rho_i_in*100
-			up_edge=10.8_wp 
+		do k=1,5
+			left_edge=-1.01_wp-1.0_wp*(k-1)
+			right_edge=-0.01_wp-1.0_wp*(k-1)
+			down_edge=-3*k_para_rho_i_in
+			up_edge=0.08_wp 
 
 			allocate(ans_z_solve(n_error))
 			allocate(ans_mul_solve(n_error))
@@ -81,27 +83,29 @@
 			deallocate(ans_f_solve)
         end do
 
-
-		kap_n_in=0.0	
-		kap_ti_in=0.1
-		kap_te_in=0.01
-		k_para_rho_i_in=0.002
-		k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)
-		k_x_rho_i_in=0.1
-		k_y_rho_i_in=0.3
-		call set_parameter_itg(beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
-		do k=1,2
-			left_edge=-10.01_wp-10.0_wp*(k-1)
-			right_edge=-0.01_wp-10.0_wp*(k-1)
-			down_edge=-3*k_para_rho_i_in*100
-			up_edge=10.8_wp 
+		mass_ratio=1836.0_wp
+		ti_div_te=1.0_wp
+		omega_pe_div_omega_ce_input=beta_in*2*c_div_v_para_input*ti_div_te/mass_ratio
+		k_para_rho_i_para_input=k_para_rho_i_in
+		k_para_rho_e_para_input=k_para_rho_e_in
+		k_para_rho_e_per_input=k_para_rho_e_in
+		k_per_rho_i_para_input=k_x_rho_i_in
+		k_per_rho_i_per_input=k_x_rho_i_in
+		k_per_rho_e_para_input=-k_x_rho_i_in/(1836.0_wp)**(0.5)
+		k_per_rho_e_per_input=-k_x_rho_i_in/(1836.0_wp)**(0.5)
+		call set_parameter(c_div_v_para_input,omega_pe_div_omega_ce_input,k_para_rho_i_para_input,k_para_rho_e_para_input,k_para_rho_e_per_input,k_per_rho_i_para_input,k_per_rho_i_per_input,k_per_rho_e_para_input,k_per_rho_e_per_input)
+		do k=1,5
+			left_edge=-1.01_wp-1.0_wp*(k-1)
+			right_edge=-0.01_wp-1.0_wp*(k-1)
+			down_edge=-3*k_para_rho_i_in
+			up_edge=0.08_wp 
 
 			allocate(ans_z_solve(n_error))
 			allocate(ans_mul_solve(n_error))
 			allocate(ans_z_error(n_error))
 			allocate(ans_f_solve(n_error))
 
-			call zero_pole_location(dispersion_function_itg,ierr,left_edge,right_edge,down_edge,up_edge,kc_square,epsilon_i,epsilon_accuracy_limit,n_circle,n_line,epsilon_0,z_solve_number,ans_z_solve,ans_mul_solve,ans_z_error,ans_f_solve)
+			call zero_pole_location(dispersion_function,ierr,left_edge,right_edge,down_edge,up_edge,kc_square,epsilon_i,epsilon_accuracy_limit,n_circle,n_line,epsilon_0,z_solve_number,ans_z_solve,ans_mul_solve,ans_z_error,ans_f_solve)
 			
 			if (my_id==0) then
 				do n=1,z_solve_number
