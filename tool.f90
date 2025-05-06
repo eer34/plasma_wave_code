@@ -337,13 +337,13 @@ contains
 		
 		D(1,1)=-(0,1)*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e-2*(0,1)*beta*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x/(-mass_ratio)*ye_pdf/k_para_rho_e
 		D(1,2)=(0,1)*(k_x_c_div_omega_ci**2+k_z_c_div_omega_ci**2)/x**2+beta*k_x_c_div_omega_ci*(kap_n_c_div_omega_ci+kap_te_c_div_omega_ci)/x**2+2*(0,1)*beta*k_x_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
-		D(1,3)=-(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_x_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))-k_x_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
+		D(1,3)=-(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_x_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))+k_x_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
 		D(2,1)=-(0,1)*(k_z_c_div_omega_ci**2+k_y_c_div_omega_ci**2)/x**2-2*(0,1)*beta*k_y_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
-		D(2,2)=(0,1)*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e+beta*k_y_c_div_omega_ci*(kap_n_c_div_omega_ci+kap_te_c_div_omega_ci)/x**2+2*(0,1)*beta*k_y_c_div_omega_ci**2/x/(-mass_ratio)*ye_pdf/k_para_rho_e
-		D(2,3)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_y_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))-k_y_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
-		D(3,1)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_y_rho_i/k_para_rho_i)
-		D(3,2)=(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2+omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_x_rho_i/k_para_rho_i)
-		D(3,3)=-(0,1)*(k_x_c_div_omega_ci**2+k_y_c_div_omega_ci**2)/x**2+(0,1)*omega_pe_div_omega_ce/x_e*(k_y_rho_i/k_para_rho_i)*((1+xe_pdf*ye_pdf)*(kap_n_rho_i-0.5*kap_te_rho_i)/k_para_rho_i+(xe_pdf**2+0.5+xe_pdf**3*ye_pdf)*kap_te_rho_i/k_para_rho_i)+2*(0,1)*omega_pe_div_omega_ce/x_e**2*(xe_pdf**2+xe_pdf**3*ye_pdf)
+		D(2,2)=(0,1)*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e+beta*k_y_c_div_omega_ci*(kap_n_c_div_omega_ci+kap_te_c_div_omega_ci)/x**2+2*(0,1)*beta*k_x_c_div_omega_ci*k_y_c_div_omega_ci/x/(-mass_ratio)*ye_pdf/k_para_rho_e
+		D(2,3)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2-beta*k_y_c_div_omega_ci/x**2*(k_y_rho_i/k_para_rho_i)*((kap_n_c_div_omega_ci+0.5*kap_te_c_div_omega_ci)*(1+xe_pdf*ye_pdf)+kap_te_c_div_omega_ci*(xe_pdf**2+0.5+xe_pdf**3*ye_pdf))+k_y_rho_i/k_para_rho_i*omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)
+		D(3,1)=(0,1)*k_x_c_div_omega_ci*k_z_c_div_omega_ci/x**2+omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_y_rho_i/k_para_rho_i)
+		D(3,2)=(0,1)*k_y_c_div_omega_ci*k_z_c_div_omega_ci/x**2-omega_pe_div_omega_ce/x_e*(1+xe_pdf*ye_pdf)*(k_x_rho_i/k_para_rho_i)
+		D(3,3)=-(0,1)*(k_x_c_div_omega_ci**2+k_y_c_div_omega_ci**2)/x**2-(0,1)*omega_pe_div_omega_ce/x_e*(k_y_rho_i/k_para_rho_i)*((1+xe_pdf*ye_pdf)*(kap_n_rho_i-0.5*kap_te_rho_i)/k_para_rho_i+(xe_pdf**2+0.5+xe_pdf**3*ye_pdf)*kap_te_rho_i/k_para_rho_i)+2*(0,1)*omega_pe_div_omega_ce/x_e**2*(xe_pdf**2+xe_pdf**3*ye_pdf)
 	
 		do k=1,9
 			select case(k)
