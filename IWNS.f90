@@ -1,61 +1,63 @@
 
 
-    program IWNS
-        use zpl5
-        use tool
-        use mpi
-        use iso_fortran_env,only:wp=>real64
-    	implicit none
-        integer::z_solve_number
-        real(wp)::left_edge,right_edge,down_edge,up_edge
-        real(wp)::kc_square,epsilon_i,epsilon_accuracy_limit,epsilon_min,epsilon_max,epsilon_0
-        complex(wp),allocatable::ans_z_solve(:)
-        integer,allocatable::ans_mul_solve(:)
-        real(wp),allocatable::ans_z_error(:)
-        complex(wp),allocatable::ans_f_solve(:)
-        integer::n_circle,n_line,n_error
-		real(wp)::ti_div_te
-       	real(wp)::c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in
-        integer::fid_1,fid_2,n,k,region_i
-        integer::ierr,my_id,num_procs
-        real(wp)::start_cpu_time,finish_cpu_time
-        real(wp)::eigen
-        complex(wp)::polar(3)
-        call mpi_init(ierr)
-        call mpi_comm_rank(mpi_comm_world,my_id,ierr)
-        call mpi_comm_size(mpi_comm_world,num_procs,ierr)
-        call cpu_time(start_cpu_time)
+program IWNS
+	use zpl5
+	use tool
+	use mpi
+	use iso_fortran_env,only:wp=>real64
+	implicit none
+	integer::z_solve_number
+	real(wp)::left_edge,right_edge,down_edge,up_edge
+	real(wp)::kc_square,epsilon_i,epsilon_accuracy_limit,epsilon_min,epsilon_max,epsilon_0
+	complex(wp),allocatable::ans_z_solve(:)
+	integer,allocatable::ans_mul_solve(:)
+	real(wp),allocatable::ans_z_error(:)
+	complex(wp),allocatable::ans_f_solve(:)
+	integer::n_circle,n_line,n_error
+	real(wp)::ti_div_te
+	   real(wp)::c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in
+	integer::fid_1,fid_2,n,k,ti_k
+	integer::ierr,my_id,num_procs
+	real(wp)::start_cpu_time,finish_cpu_time
+	real(wp)::eigen
+	real(wp)::lambda_1_in
+	complex(wp)::polar(3)
+	call mpi_init(ierr)
+	call mpi_comm_rank(mpi_comm_world,my_id,ierr)
+	call mpi_comm_size(mpi_comm_world,num_procs,ierr)
+	call cpu_time(start_cpu_time)
 
-        fid_1=1
-		fid_2=10
-        n_error=1000
-		kc_square=128.0_wp
-		epsilon_i=1d-7
-		epsilon_accuracy_limit=1d-6
-		n_circle=400
-		n_line=400
-		epsilon_0=0.1_wp
-        
-        if (my_id==0) then
-	  		open(fid_1,file='itg_full.csv')
-			open(fid_2,file='itg_gyro.csv')
-        end if
-		c_div_v_para_input=470000.0_wp
-		beta_in=0.0001
-		kap_n_in=0.0*(2.0)**(0.5)	
-		kap_ti_in=0.1*(2.0)**(0.5)	
-		kap_te_in=0.01*(2.0)**(0.5)	
-		k_para_rho_i_in=0.002*(2.0)**(0.5)	
-		k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)	
-		k_x_rho_i_in=0.1*(2.0)**(0.5)	
-		k_y_rho_i_in=0.3*(2.0)**(0.5)	
-
-		call set_parameter_itg_full(c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
-		do k=1,2
-			left_edge=-10.01_wp-10.0_wp*(k-1)
-			right_edge=-0.01_wp-10.0_wp*(k-1)
-			down_edge=-3*k_para_rho_i_in*100
-			up_edge=10.8_wp 
+	fid_1=1
+	fid_2=10
+	n_error=1000
+	kc_square=128.0_wp
+	epsilon_i=1d-7
+	epsilon_accuracy_limit=1d-6
+	n_circle=400
+	n_line=400
+	epsilon_0=0.1_wp
+	
+	if (my_id==0) then
+	        open(fid_1,file='itg_full.csv')
+		open(fid_2,file='itg_gyro.csv')
+	end if
+	c_div_v_para_input=470000.0_wp
+	beta_in=0.0001
+	kap_n_in=-0.05*(2.0)**(0.5)	
+	kap_ti_in=0.0*(2.0)**(0.5)	
+	kap_te_in=0.0*(2.0)**(0.5)
+	k_para_rho_i_in=0.002*(2.0)**(0.5)		
+	k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)
+	k_x_rho_i_in=1.0*(2.0)**(0.5)
+	k_y_rho_i_in=1.0*(2.0)**(0.5)
+	do ti_k=-10,10
+		lambda_1_in=0.1*ti_k
+		call set_parameter_itg_full(c_div_v_para_input,beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in,lambda_1_in)
+		do k=1,3
+			left_edge=5.1_wp-10.0_wp*(k-1)
+			right_edge=left_edge+10.0_wp
+			down_edge=-2*k_para_rho_i_in*100
+			up_edge=1.8_wp 
 
 			allocate(ans_z_solve(n_error))
 			allocate(ans_mul_solve(n_error))
@@ -63,7 +65,7 @@
 			allocate(ans_f_solve(n_error))
 
 			call zero_pole_location(dispersion_function_itg_full,ierr,left_edge,right_edge,down_edge,up_edge,kc_square,epsilon_i,epsilon_accuracy_limit,n_circle,n_line,epsilon_0,z_solve_number,ans_z_solve,ans_mul_solve,ans_z_error,ans_f_solve)
-			
+		
 			if (my_id==0) then
 				do n=1,z_solve_number
 					write(*,*),n,':'
@@ -71,30 +73,32 @@
 					write(*,*),'ans_mul_solve are',ans_mul_solve(n)
 					write(*,*),'ans_z_error are',ans_z_error(n)
 					write(*,*),'ans_f_solve are',ans_f_solve(n)
-					write(fid_1,'(*(G30.7,:,",",X))') kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_x_rho_i_in,k_y_rho_i_in,real(ans_z_solve(n)),aimag(ans_z_solve(n)),ans_mul_solve(n),ans_z_error(n),abs(ans_f_solve(n))
-					
+					call polarization(ans_z_solve(n),eigen,polar)
+					write(fid_1,'(*(G30.7,:,",",X))') kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_x_rho_i_in,k_y_rho_i_in,real(ans_z_solve(n)),aimag(ans_z_solve(n)),ans_mul_solve(n),ans_z_error(n),abs(ans_f_solve(n)),eigen,polar(1),polar(2),polar(3)
+				
 				end do
 			end if
 			deallocate(ans_z_solve)
 			deallocate(ans_mul_solve)
 			deallocate(ans_z_error)
 			deallocate(ans_f_solve)
-        end do
+		end do
+	end do
 
-
-		kap_n_in=0.0	
-		kap_ti_in=0.1
-		kap_te_in=0.01
-		k_para_rho_i_in=0.002
-		k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)
-		k_x_rho_i_in=0.1
-		k_y_rho_i_in=0.3
+	kap_ti_in=0.0	
+	kap_te_in=0.0
+	k_para_rho_i_in=0.002	
+	k_para_rho_e_in=-k_para_rho_i_in/(1836.0)**(0.5)	
+	k_x_rho_i_in=1.0
+	k_y_rho_i_in=1.0
+	do ti_k=5,5
+		kap_n_in=0.01*ti_k
 		call set_parameter_itg(beta_in,kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_para_rho_e_in,k_x_rho_i_in,k_y_rho_i_in)
-		do k=1,2
-			left_edge=-10.01_wp-10.0_wp*(k-1)
-			right_edge=-0.01_wp-10.0_wp*(k-1)
-			down_edge=-3*k_para_rho_i_in*100
-			up_edge=10.8_wp 
+		do k=1,10
+			left_edge=40.1_wp-10.0_wp*(k-1)
+			right_edge=left_edge+10.0_wp
+			down_edge=-2*k_para_rho_i_in*100
+			up_edge=4.8_wp 
 
 			allocate(ans_z_solve(n_error))
 			allocate(ans_mul_solve(n_error))
@@ -102,7 +106,7 @@
 			allocate(ans_f_solve(n_error))
 
 			call zero_pole_location(dispersion_function_itg,ierr,left_edge,right_edge,down_edge,up_edge,kc_square,epsilon_i,epsilon_accuracy_limit,n_circle,n_line,epsilon_0,z_solve_number,ans_z_solve,ans_mul_solve,ans_z_error,ans_f_solve)
-			
+		
 			if (my_id==0) then
 				do n=1,z_solve_number
 					write(*,*),n,':'
@@ -111,20 +115,21 @@
 					write(*,*),'ans_z_error are',ans_z_error(n)
 					write(*,*),'ans_f_solve are',ans_f_solve(n)
 					write(fid_2,'(*(G30.7,:,",",X))') kap_n_in,kap_ti_in,kap_te_in,k_para_rho_i_in,k_x_rho_i_in,k_y_rho_i_in,real(ans_z_solve(n)),aimag(ans_z_solve(n)),ans_mul_solve(n),ans_z_error(n),abs(ans_f_solve(n))
-					
+				
 				end do
 			end if
 			deallocate(ans_z_solve)
 			deallocate(ans_mul_solve)
 			deallocate(ans_z_error)
 			deallocate(ans_f_solve)
-        end do
-        call cpu_time(finish_cpu_time)
-        if (my_id==0) then
-			close(fid_1)
-			close(fid_2)
-			write(*,*),'running time is',finish_cpu_time-start_cpu_time
-		end if
-		call mpi_finalize(ierr)
-       end program IWNS
+		end do
+	end do
+	call cpu_time(finish_cpu_time)
+	if (my_id==0) then
+		close(fid_1)
+		close(fid_2)
+		write(*,*),'running time is',finish_cpu_time-start_cpu_time
+	end if
+	call mpi_finalize(ierr)
+   end program IWNS
 
